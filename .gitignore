@@ -129,9 +129,9 @@ dmypy.json
 .pyre/
 
 # bag files
-.bag
+*.bag
 
 #zip files
-.zip
+*.zip
 .tar
 .rar
