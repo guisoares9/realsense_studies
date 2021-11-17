@@ -133,5 +133,8 @@ dmypy.json
 
 #zip files
 *.zip
-.tar
-.rar
+*.tar
+*.rar
+
+# vscode
+.vscode/

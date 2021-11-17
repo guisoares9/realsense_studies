@@ -1,16 +1,31 @@
-## License: Apache 2.0. See LICENSE file in root directory.
-## Copyright(c) 2017 Intel Corporation. All Rights Reserved.
-
-#####################################################
-##              Align Depth to Color               ##
-#####################################################
-
-# First import the library
+# First import library
 import pyrealsense2 as rs
 # Import Numpy for easy array manipulation
 import numpy as np
 # Import OpenCV for easy image rendering
 import cv2
+# Import argparse for command-line options
+import argparse
+# Import os.path for file path manipulation
+import os.path
+
+# Create object for parsing command-line options
+parser = argparse.ArgumentParser(description="Read recorded bag file and display depth stream in jet colormap.\
+                                Remember to change the stream fps and format to match the recorded.")
+# Add argument which takes path to a bag file as an input
+parser.add_argument("-i", "--input", type=str, help="Path to the bag file", default="guilherme-rgbd.bag")
+# Parse the command line arguments to an object
+args = parser.parse_args()
+# Safety if no parameter have been given
+if not args.input:
+    print("No input paramater have been given.")
+    print("For help type --help")
+    exit()
+# Check if the given file have bag extension
+if os.path.splitext(args.input)[1] != ".bag":
+    print("The given file is not of correct file format.")
+    print("Only .bag files are accepted")
+    exit()
 
 # Create a pipeline
 pipeline = rs.pipeline()
@@ -19,27 +34,13 @@ pipeline = rs.pipeline()
 #  different resolutions of color and depth streams
 config = rs.config()
 
-# Get device product line for setting a supporting resolution
-pipeline_wrapper = rs.pipeline_wrapper(pipeline)
-pipeline_profile = config.resolve(pipeline_wrapper)
-device = pipeline_profile.get_device()
-device_product_line = str(device.get_info(rs.camera_info.product_line))
+# Tell config that we will use a recorded device from file to be used by the pipeline through playback.
+rs.config.enable_device_from_file(config, args.input)
 
-found_rgb = False
-for s in device.sensors:
-    if s.get_info(rs.camera_info.name) == 'RGB Camera':
-        found_rgb = True
-        break
-if not found_rgb:
-    print("The demo requires Depth camera with Color sensor")
-    exit(0)
-
-config.enable_stream(rs.stream.depth, 640, 480, rs.format.z16, 30)
-
-if device_product_line == 'L500':
-    config.enable_stream(rs.stream.color, 960, 540, rs.format.bgr8, 30)
-else:
-    config.enable_stream(rs.stream.color, 640, 480, rs.format.bgr8, 30)
+# Configure the pipeline to stream the depth stream
+# Change this parameters according to the recorded bag file resolution
+config.enable_stream(rs.stream.depth, rs.format.z16, 30)
+config.enable_stream(rs.stream.color, rs.format.rgb8, 30)
 
 # Start streaming
 profile = pipeline.start(config)
@@ -91,9 +92,10 @@ try:
         #   depth on right
         depth_colormap = cv2.applyColorMap(cv2.convertScaleAbs(depth_image, alpha=0.03), cv2.COLORMAP_JET)
         images = np.hstack((bg_removed, depth_colormap))
+        imgResize = cv2.resize(images,(640,480))
 
         cv2.namedWindow('Align Example', cv2.WINDOW_NORMAL)
-        cv2.imshow('Align Example', images)
+        cv2.imshow('Align Example', imgResize)
         key = cv2.waitKey(1)
         # Press esc or 'q' to close the image window
         if key & 0xFF == ord('q') or key == 27:
