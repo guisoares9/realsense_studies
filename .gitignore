@@ -130,3 +130,8 @@ dmypy.json
 
 # bag files
 .bag
+
+#zip files
+.zip
+.tar
+.rar
