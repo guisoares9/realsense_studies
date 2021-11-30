@@ -1,5 +1,6 @@
 # First import library
 from numpy.lib.polynomial import _polyint_dispatcher
+from numpy.lib.shape_base import expand_dims
 import pyrealsense2 as rs
 # Import Numpy for easy array manipulation
 import numpy as np
@@ -30,12 +31,6 @@ if os.path.splitext(args.input)[1] != ".bag":
     print("The given file is not of correct file format.")
     print("Only .bag files are accepted")
     exit()
-
-# Declare pointcloud object, for calculating pointclouds and texture mappings
-#pc = rs.pointcloud()
-
-# We want the points object to be persistent so we can display the last cloud when a frame drops
-#points = rs.points()
 
 # Declare pointcloud object
 pcd = o3d.geometry.PointCloud()
@@ -110,40 +105,30 @@ try:
         if not depth_frame or not color_frame:
             continue
 
-        depth_image = np.asanyarray(depth_frame.get_data())
+        # Transform in array
+        depth_image = np.array(depth_frame.get_data())
         scaled_depth_image = depth_image*depth_scale # Transform depths values to a real world depth value in meters
-        color_image = np.asanyarray(color_frame.get_data())
+        color_image = np.array(color_frame.get_data())
 
-        # Transform a 2D pixel and depth information into a xyz coordinates
-    
-        pc = rs.pointcloud()
-        pc.map_to(color_frame)
-        points = pc.calculate(depth_frame)
+        #Deproject method
+        num_rows = scaled_depth_image.shape[0] # Number of rows in scaled_depth_image
+        num_columns = scaled_depth_image.shape[1] # Number of columns in scaled_depth_image
+        depth_intrin = aligned_depth_frame.profile.as_video_stream_profile().intrinsics # Intrinsics parameters
 
-        vtx = points.get_vertices()
-        vtx = np.array(vtx)
-        vtx = [list(x) for x in vtx]
-        vtx = np.array(vtx)
-        
-
-        # # Remove background - Set pixels further than clipping_distance to grey
-        # grey_color = 153
-        # depth_image_3d = np.dstack((depth_image,depth_image,depth_image)) #depth image is 1 channel, color is 3 channels
-        # bg_removed = np.where((depth_image_3d > clipping_distance) | (depth_image_3d <= 0), grey_color, color_image)
-
-        # Render images:
-        #   depth align to color on left
-        #   depth on right
-        # depth_colormap = cv2.applyColorMap(cv2.convertScaleAbs(depth_image, alpha=0.03), cv2.COLORMAP_JET)
-        # images = np.hstack((bg_removed, depth_colormap))
-        # imgResize = cv2.resize(images,(640,480))
-
-        #print(depth_image.shape)
-        #imgReshape = depth_image.reshape(307200, 3)
-        #print(depth_image)
+        p = 0
+        xyz = np.empty([921600, 3]) # Will store the xyz coordinates
+        for r in range(0, num_rows):
+            for c in range(0, num_columns):
+                depth = aligned_depth_frame.get_distance(c, r)
+                if depth > 1: # Background removal: if the distance is more than 1 meter, filter it
+                    depth = 0
+                depth_point_in_meters_camera_coords = rs.rs2_deproject_pixel_to_point(depth_intrin, [c, r], depth)
+                for q in range(3):                                                                                          # [x, y, z]
+                    xyz[p,q] = depth_point_in_meters_camera_coords[q] # Store depth_point_in_meters_camera_coords in an array [x, y, z]
+                p = p + 1                                                                                                   # [x, y, z]      
 
         # Pass images, which is an array, to Open3D.o3d.geometry.PointCloud
-        pcd.points = o3d.utility.Vector3dVector(vtx)
+        pcd.points = o3d.utility.Vector3dVector(xyz)
         # o3d.io.write_point_cloud("sync.ply", pcd)
         
         print(f"{time.time()-t} segundos")
@@ -156,8 +141,6 @@ try:
         vis.update_renderer()
         cv2.imshow("frame", color_image)
         
-        # cv2.namedWindow('Align Example', cv2.WINDOW_NORMAL)
-        # cv2.imshow('Align Example', imgResize)
         key = cv2.waitKey(1)
         # Press esc or 'q' to close the image window
         if key & 0xFF == ord('q') or key == 27:
