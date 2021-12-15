@@ -164,11 +164,11 @@ try:
         # math.sqrt method for background removal
         num_rows = vtx.shape[0] # Number of rows in vtx (921600,3)
         num_columns = vtx.shape[1] # Number of columns in vtx
-        for r in range(num_rows):
-            for c in range(num_columns):
-                depth = math.sqrt(vtx[r][0]**2 + vtx[r][1]**2 + vtx[r][2]**2) # Calculates distance to origin
-                if depth > 1: # Background removal: if the distance is more than 1 meter, filter it
-                    vtx[r,:] = 0
+        # for r in range(num_rows):
+        #     for c in range(num_columns):
+        #         depth = math.sqrt(vtx[r][0]**2 + vtx[r][1]**2 + vtx[r][2]**2) # Calculates distance to origin
+        #         if depth > 1: # Background removal: if the distance is more than 1 meter, filter it
+        #             vtx[r,:] = 0
 
         # Einsum method for background removal
         #num_rows = vtx.shape[0] # Number of rows in vtx (921600,3)

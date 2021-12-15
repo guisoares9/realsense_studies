@@ -14,6 +14,15 @@ import open3d as o3d
 import time
 from helper_functions import convert_depth_frame_to_pointcloud
 
+import threading
+
+def updateViewer(vis, pcd):
+
+    vis.add_geometry(pcd)
+    vis.poll_events()
+    vis.update_renderer()
+    return None
+
 # Create object for parsing command-line options
 parser = argparse.ArgumentParser(description="Read recorded bag file and display depth stream in jet colormap.\
                                 Remember to change the stream fps and format to match the recorded.")
@@ -81,6 +90,11 @@ filters = [rs.disparity_transform(),
            rs.temporal_filter(),
            rs.disparity_transform(False)]
 
+# First time creating the thread
+vis_trd = threading.Thread(target = updateViewer, args = [vis, pcd])
+
+vis_trd.start()
+
 # Streaming loop
 try:
     while True:
@@ -123,24 +137,30 @@ try:
 
         pointcloud = convert_depth_frame_to_pointcloud(scaled_depth_image, intrin)
         pointcloud = np.asanyarray(pointcloud)# Transform a tuple in a an array
-        num_rows = pointcloud.shape[0] # Number of rows in pointcloud
-        num_columns = pointcloud.shape[1] # Number of columns in pointcloud
-        xyz = np.empty([num_columns, 3]) # Will store the xyz coordinates
-        for i in range(num_rows):
-            for j in range(num_columns):
-                xyz[j][i] = pointcloud[i][j] # xyz is the point cloud in format [x, y, z]
+        xyz = pointcloud.tolist()
+        xyz = np.array(xyz).T
+        print(xyz.shape)
+        # num_rows = pointcloud.shape[0] # Number of rows in pointcloud
+        # num_columns = pointcloud.shape[1] # Number of columns in pointcloud
+        # xyz = np.empty([num_columns, 3]) # Will store the xyz coordinates
+        # for i in range(num_rows):
+        #     for j in range(num_columns):
+        #         xyz[j][i] = pointcloud[i][j] # xyz is the point cloud in format [x, y, z]
 
 
         # Pass images, which is an array, to Open3D.o3d.geometry.PointCloud
         pcd.points = o3d.utility.Vector3dVector(xyz)
         
         print(f"{time.time()-t} segundos")
-              
+
         trans = [[1, 0, 0, 0], [0, -1, 0, 0], [0, 0, -1, 0], [0, 0, 0, 1]]
         pcd.transform(trans)
-        vis.add_geometry(pcd)
-        vis.poll_events()
-        vis.update_renderer()
+        
+        vis_trd.join()
+        vis_trd = threading.Thread(target = updateViewer, args = [vis, pcd])
+
+        vis_trd.start()
+        
         cv2.imshow("frame", color_image)
         
         key = cv2.waitKey(1)
@@ -151,3 +171,4 @@ try:
 finally:
     vis.destroy_window()
     pipeline.stop()
+    vis_trd.join()
