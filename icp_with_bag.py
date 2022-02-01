@@ -165,11 +165,16 @@ try:
         # Convert xyz, which is an array, to Open3D.o3d.geometry.PointCloud
         pcd.points = o3d.utility.Vector3dVector(xyz)
 
+        print(f"{time.time()-t} segundos")
+
         # Rotate pcd to 180 in y (the original pcd is upsidedown)
         trans_pcd = [[1, 0, 0, 0], [0, -1, 0, 0], [0, 0, -1, 0], [0, 0, 0, 1]]
         pcd.transform(trans_pcd)
-        
-        print(f"{time.time()-t} segundos")
+
+        # # Find the inicial position of brain
+        # trans_brain = [[1, 0, 0, 0], [0, 0, 1, 0], [0, -1, 0, -900], [0, 0, 0, 1]]
+        # brain.transform(trans_brain)
+        # o3d.visualization.draw_geometries([pcd, brain])
 
         #downpcd = pcd.voxel_down_sample(voxel_size=1)
         #down_xyz = np.asarray(downpcd.points)
@@ -177,10 +182,10 @@ try:
 
 
         # ICP
-        threshold = 0.02
-        trans_init = np.asarray([[1, 0, 0, 100],
-                                [0, 0, 1, 100],
-                                [0, -1, 0, -750], 
+        threshold = 20
+        trans_init = np.asarray([[1, 0, 0, 0],
+                                [0, 1, 0, 0],
+                                [0, 0, 1, -600], 
                                 [0, 0, 0, 1]])
         #draw_registration_result(brain, pcd, trans_init)
 
@@ -189,12 +194,10 @@ try:
         # print("evaluation: ", evaluation.transformation)
 
         print("Apply point-to-point ICP")
-        for i in range(0,100):
-            reg_p2p = o3d.pipelines.registration.registration_icp(brain, pcd, threshold, trans_init, o3d.pipelines.registration.TransformationEstimationPointToPoint())
-            print(reg_p2p)
-        #print("Transformation is:")
-        #print(reg_p2p.transformation)
-        #print("")
+        reg_p2p = o3d.pipelines.registration.registration_icp(brain, pcd, threshold, trans_init, o3d.pipelines.registration.TransformationEstimationPointToPoint())
+        print(reg_p2p)
+        print("Transformation is:")
+        print(reg_p2p.transformation)
         draw_registration_result(brain, pcd, reg_p2p.transformation)
         
         #vis_trd.join()

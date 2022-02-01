@@ -5,6 +5,7 @@ import open3d as o3d
 # Import copy
 import copy
 import numpy as np
+import time
 
 # Drawing surface matching result
 def draw_registration_result(source, target, transformation):
@@ -19,32 +20,36 @@ def draw_registration_result(source, target, transformation):
 
 # Load brain and head point cloud
 brain = o3d.io.read_point_cloud("brain.pcd")
-head = o3d.io.read_point_cloud("head_2.pcd")
+head = o3d.io.read_point_cloud("head_1.pcd")
 
 # Forward head position
 trans_head= [[1, 0, 0, 0], [0, 0, 1, 0], [0, 1, 0, 0], [0, 0, 0, 1]]
 head.transform(trans_head)
+head.scale(1.1, center=head.get_center())
 
-# Find the inicial transformation
-# trans_brain= [[1, 0, 0, 0], [0, 0, 1, 1250], [0, -1, 0, -170], [0, 0, 0, 1]]
+# # Find the inicial position
+# trans_brain= [[1, 0, 0, 0], [0, 0, 1, 150], [0, -1, 0, -175], [0, 0, 0, 1]]
 # brain.transform(trans_brain)
 # o3d.visualization.draw_geometries([head, brain])
 
 # ICP
-threshold = 0.02
+threshold = 20
 trans_init = np.asarray([[1, 0, 0, 0],
-                                [0, 0, 1, 1250],
-                                [0, -1, 0, -170], 
+                                [0, 0, 1, 150],
+                                [0, -1, 0, -175], 
                                 [0, 0, 0, 1]])
 
 # print("Initial alignment")
-# evaluation = o3d.pipelines.registration.evaluate_registration(brain, pcd, threshold, trans_init)
+# evaluation = o3d.pipelines.registration.evaluate_registration(brain, head, threshold, trans_init)
 # print("evaluation: ", evaluation.transformation)
 
+t = time.time()
 print("Apply point-to-point ICP")
-reg_p2p = o3d.pipelines.registration.registration_icp(brain, head, threshold, trans_init, o3d.pipelines.registration.TransformationEstimationPointToPoint(), o3d.pipelines.registration.ICPConvergenceCriteria(max_iteration=20000))
+reg_p2p = o3d.pipelines.registration.registration_icp(brain, head, threshold, trans_init, o3d.pipelines.registration.TransformationEstimationPointToPoint(), o3d.pipelines.registration.ICPConvergenceCriteria(max_iteration=200))
+print(f"{time.time()-t} segundos")
+
 print(reg_p2p)
-#print("Transformation is:")
-#print(reg_p2p.transformation)
+print("Transformation is:")
+print(reg_p2p.transformation)
 #print("")
 draw_registration_result(brain, head, reg_p2p.transformation)
