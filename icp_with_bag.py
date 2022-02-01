@@ -1,6 +1,5 @@
 # First import library
 from numpy.lib.polynomial import _polyint_dispatcher
-from numpy.lib.shape_base import expand_dims
 import pyrealsense2 as rs
 # Import Numpy for easy array manipulation
 import numpy as np
@@ -12,13 +11,42 @@ import argparse
 import os.path
 # Import Open3D library
 import open3d as o3d
+# Import time library
 import time
+# Import realsense helper function
+from helper_functions import convert_depth_frame_to_pointcloud
+# Import threading
+import threading
+# Import copy
+import copy
+
+# def updateViewer(vis, pcd):
+
+#     vis.add_geometry(pcd)
+#     vis.add_geometry(brain)
+#     vis.poll_events()
+#     vis.update_renderer()
+#     return None
+
+# Drawing surface matching result
+def draw_registration_result(source, target, transformation):
+
+    source_temp = copy.deepcopy(source)
+    target_temp = copy.deepcopy(target)
+    source_temp.paint_uniform_color([1, 0.706, 0])
+    target_temp.paint_uniform_color([0, 0.651, 0.929])
+    source_temp.transform(transformation)
+    o3d.visualization.draw_geometries([source_temp, target_temp])
+
+
+# Load brain point cloud
+brain = o3d.io.read_point_cloud("brain.pcd")
 
 # Create object for parsing command-line options
 parser = argparse.ArgumentParser(description="Read recorded bag file and display depth stream in jet colormap.\
                                 Remember to change the stream fps and format to match the recorded.")
 # Add argument which takes path to a bag file as an input
-parser.add_argument("-i", "--input", type=str, help="Path to the bag file", default="guilherme-rgbd2.bag")
+parser.add_argument("-i", "--input", type=str, help="Path to the bag file", default="guilherme-rgbd.bag")
 # Parse the command line arguments to an object
 args = parser.parse_args()
 # Safety if no parameter have been given
@@ -81,10 +109,17 @@ filters = [rs.disparity_transform(),
            rs.temporal_filter(),
            rs.disparity_transform(False)]
 
+# First time creating the thread
+#vis_trd = threading.Thread(target = updateViewer, args = [vis, pcd])
+
+#vis_trd.start()
+
 # Streaming loop
 try:
     while True:
+
         t = time.time()
+
         # Get frameset of color and depth
         frames = pipeline.wait_for_frames()
         # frames.get_depth_frame() is a 640x360 depth image
@@ -105,42 +140,80 @@ try:
         if not depth_frame or not color_frame:
             continue
 
-        # Transform in array
-        depth_image = np.array(depth_frame.get_data())
+        depth_image = np.asanyarray(depth_frame.get_data())
         scaled_depth_image = depth_image*depth_scale # Transform depths values to a real world depth value in meters
-        color_image = np.array(color_frame.get_data())
+        color_image = np.asanyarray(color_frame.get_data())
 
-        #Deproject method
+
+        # Convert depth frame to point cloud and do a background removal
+
+        intrin = aligned_depth_frame.profile.as_video_stream_profile().intrinsics # Intrinsics parameters
         num_rows = scaled_depth_image.shape[0] # Number of rows in scaled_depth_image
         num_columns = scaled_depth_image.shape[1] # Number of columns in scaled_depth_image
-        depth_intrin = aligned_depth_frame.profile.as_video_stream_profile().intrinsics # Intrinsics parameters
 
-        p = 0
-        xyz = np.empty([921600, 3]) # Will store the xyz coordinates
         for r in range(0, num_rows):
             for c in range(0, num_columns):
-                depth = aligned_depth_frame.get_distance(c, r)
-                if depth > 1: # Background removal: if the distance is more than 1 meter, filter it
-                    depth = 0
-                depth_point_in_meters_camera_coords = rs.rs2_deproject_pixel_to_point(depth_intrin, [c, r], depth)
-                for q in range(3):                                                                                          # [x, y, z]
-                    xyz[p,q] = depth_point_in_meters_camera_coords[q] # Store depth_point_in_meters_camera_coords in an array [x, y, z]
-                p = p + 1                                                                                                   # [x, y, z]      
+                if scaled_depth_image[r][c] > 1: # Background removal: if the distance is more than 1 meter, filter it
+                    scaled_depth_image[r][c] = 0
 
-        # Pass images, which is an array, to Open3D.o3d.geometry.PointCloud
+        pointcloud = convert_depth_frame_to_pointcloud(scaled_depth_image, intrin)
+        pointcloud = np.asanyarray(pointcloud)# Transform a tuple in a an array
+        xyz = pointcloud.tolist()
+        xyz = np.array(xyz).T*1000 # Multiply by 1000 to ajust scale
+
+
+        # Convert xyz, which is an array, to Open3D.o3d.geometry.PointCloud
         pcd.points = o3d.utility.Vector3dVector(xyz)
-        # o3d.io.write_point_cloud("sync.ply", pcd)
+
+        # Rotate pcd to 180 in y (the original pcd is upsidedown)
+        trans_pcd = [[1, 0, 0, 0], [0, -1, 0, 0], [0, 0, -1, 0], [0, 0, 0, 1]]
+        pcd.transform(trans_pcd)
         
         print(f"{time.time()-t} segundos")
+
+        #downpcd = pcd.voxel_down_sample(voxel_size=1)
+        #down_xyz = np.asarray(downpcd.points)
+        #o3d.visualization.draw_geometries([downpcd])
+
+
+        # ICP
+        threshold = 0.02
+        trans_init = np.asarray([[1, 0, 0, 100],
+                                [0, 0, 1, 100],
+                                [0, -1, 0, -750], 
+                                [0, 0, 0, 1]])
+        #draw_registration_result(brain, pcd, trans_init)
+
+        # print("Initial alignment")
+        # evaluation = o3d.pipelines.registration.evaluate_registration(brain, pcd, threshold, trans_init)
+        # print("evaluation: ", evaluation.transformation)
+
+        print("Apply point-to-point ICP")
+        for i in range(0,100):
+            reg_p2p = o3d.pipelines.registration.registration_icp(brain, pcd, threshold, trans_init, o3d.pipelines.registration.TransformationEstimationPointToPoint())
+            print(reg_p2p)
+        #print("Transformation is:")
+        #print(reg_p2p.transformation)
+        #print("")
+        draw_registration_result(brain, pcd, reg_p2p.transformation)
         
+        #vis_trd.join()
+        #vis_trd = threading.Thread(target = updateViewer, args = [vis, pcd])
+
+        #vis_trd.start()
         
-        trans = [[1, 0, 0, 0], [0, -1, 0, 0], [0, 0, -1, 0], [0, 0, 0, 1]]
-        pcd.transform(trans)
-        vis.add_geometry(pcd)
-        vis.poll_events()
-        vis.update_renderer()
-        cv2.imshow("frame", color_image)
-        
+        #cv2.imshow("frame", color_image)
+
+        # pcd_center = pcd.get_center()
+        # brain_center = brain.get_center()
+        # print("pcd:", pcd_center)
+        # print("brain:", brain_center)
+
+        #o3d.visualization.draw_geometries([pcd, brain])
+        # vis.add_geometry(pcd)
+        # vis.add_geometry(brain)
+        # vis.poll_events()
+        # vis.update_renderer()
         key = cv2.waitKey(1)
         # Press esc or 'q' to close the image window
         if key & 0xFF == ord('q') or key == 27:
@@ -149,3 +222,4 @@ try:
 finally:
     vis.destroy_window()
     pipeline.stop()
+    #vis_trd.join()

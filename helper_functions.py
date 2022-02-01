@@ -177,7 +177,7 @@ def convert_depth_frame_to_pointcloud(depth_image, camera_intrinsics ):
 	x = (u.flatten() - camera_intrinsics.ppx)/camera_intrinsics.fx
 	y = (v.flatten() - camera_intrinsics.ppy)/camera_intrinsics.fy
 
-	z = depth_image.flatten() / 1000;
+	z = depth_image.flatten();
 	x = np.multiply(x,z)
 	y = np.multiply(y,z)
 

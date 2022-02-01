@@ -139,7 +139,7 @@ try:
         pointcloud = np.asanyarray(pointcloud)# Transform a tuple in a an array
         xyz = pointcloud.tolist()
         xyz = np.array(xyz).T
-        print(xyz.shape)
+        #print(xyz.shape)
         # num_rows = pointcloud.shape[0] # Number of rows in pointcloud
         # num_columns = pointcloud.shape[1] # Number of columns in pointcloud
         # xyz = np.empty([num_columns, 3]) # Will store the xyz coordinates
@@ -152,6 +152,10 @@ try:
         pcd.points = o3d.utility.Vector3dVector(xyz)
         
         print(f"{time.time()-t} segundos")
+
+        #downpcd = pcd.voxel_down_sample(voxel_size=1)
+        #down_xyz = np.asarray(downpcd.points)
+        #o3d.visualization.draw_geometries([downpcd])
 
         trans = [[1, 0, 0, 0], [0, -1, 0, 0], [0, 0, -1, 0], [0, 0, 0, 1]]
         pcd.transform(trans)
