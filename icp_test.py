@@ -20,23 +20,23 @@ def draw_registration_result(source, target, transformation):
 
 # Load brain and head point cloud
 brain = o3d.io.read_point_cloud("brain.pcd")
-head = o3d.io.read_point_cloud("head_1.pcd")
+head = o3d.io.read_point_cloud("head.pcd")
 
 # Forward head position
 trans_head= [[1, 0, 0, 0], [0, 0, 1, 0], [0, 1, 0, 0], [0, 0, 0, 1]]
 head.transform(trans_head)
-head.scale(1.1, center=head.get_center())
+#head.scale(1.1, center=head.get_center())
 
 # # Find the inicial position
-# trans_brain= [[1, 0, 0, 0], [0, 0, 1, 150], [0, -1, 0, -175], [0, 0, 0, 1]]
+# trans_brain= [[1, 0, 0, 0], [0, 0, 1, 1260], [0, -1, 0, -165], [0, 0, 0, 1]]
 # brain.transform(trans_brain)
 # o3d.visualization.draw_geometries([head, brain])
 
 # ICP
 threshold = 20
 trans_init = np.asarray([[1, 0, 0, 0],
-                                [0, 0, 1, 150],
-                                [0, -1, 0, -175], 
+                                [0, 0, 1, 195],
+                                [0, -1, 0, 15], 
                                 [0, 0, 0, 1]])
 
 # print("Initial alignment")
@@ -45,7 +45,7 @@ trans_init = np.asarray([[1, 0, 0, 0],
 
 t = time.time()
 print("Apply point-to-point ICP")
-reg_p2p = o3d.pipelines.registration.registration_icp(brain, head, threshold, trans_init, o3d.pipelines.registration.TransformationEstimationPointToPoint(), o3d.pipelines.registration.ICPConvergenceCriteria(max_iteration=200))
+reg_p2p = o3d.pipelines.registration.registration_icp(brain, head, threshold, trans_init, o3d.pipelines.registration.TransformationEstimationPointToPlane(), o3d.pipelines.registration.ICPConvergenceCriteria(max_iteration=200))
 print(f"{time.time()-t} segundos")
 
 print(reg_p2p)

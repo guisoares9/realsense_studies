@@ -141,7 +141,8 @@ try:
             continue
 
         depth_image = np.asanyarray(depth_frame.get_data())
-        scaled_depth_image = depth_image*depth_scale # Transform depths values to a real world depth value in meters
+        cropped_depth_image = depth_image[50:500, 500:900] # Bounding box: cropp shoulders
+        scaled_depth_image = cropped_depth_image*depth_scale # Transform depths values to a real world depth value in meters
         color_image = np.asanyarray(color_frame.get_data())
 
 
@@ -153,7 +154,7 @@ try:
 
         for r in range(0, num_rows):
             for c in range(0, num_columns):
-                if scaled_depth_image[r][c] > 1: # Background removal: if the distance is more than 1 meter, filter it
+                if scaled_depth_image[r][c] > 0.75: # Background removal: if the distance is more than 1 meter, filter it
                     scaled_depth_image[r][c] = 0
 
         pointcloud = convert_depth_frame_to_pointcloud(scaled_depth_image, intrin)
@@ -172,7 +173,7 @@ try:
         pcd.transform(trans_pcd)
 
         # # Find the inicial position of brain
-        # trans_brain = [[1, 0, 0, 0], [0, 0, 1, 0], [0, -1, 0, -900], [0, 0, 0, 1]]
+        # trans_brain = [[1, 0, 0, -300], [0, 0, 1, 90], [0, -1, 0, -750], [0, 0, 0, 1]]
         # brain.transform(trans_brain)
         # o3d.visualization.draw_geometries([pcd, brain])
 
@@ -183,9 +184,9 @@ try:
 
         # ICP
         threshold = 20
-        trans_init = np.asarray([[1, 0, 0, 0],
-                                [0, 1, 0, 0],
-                                [0, 0, 1, -600], 
+        trans_init = np.asarray([[1, 0, 0, -300],
+                                [0, 1, 0, 90],
+                                [0, 0, 1, -750], 
                                 [0, 0, 0, 1]])
         #draw_registration_result(brain, pcd, trans_init)
 

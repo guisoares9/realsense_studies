@@ -67,10 +67,8 @@ depth_sensor = profile.get_device().first_depth_sensor()
 depth_scale = depth_sensor.get_depth_scale()
 print("Depth Scale is: " , depth_scale)
 
-# We will be removing the background of objects more than
-#  clipping_distance_in_meters meters away
-clipping_distance_in_meters = 1 #1 meter
-clipping_distance = clipping_distance_in_meters / depth_scale
+# We will be removing the background of objects more than clipping_distance in meters away
+clipping_distance = 0.75
 
 # Create an align object
 # rs.align allows us to perform alignment of depth frames to others frames
@@ -120,7 +118,8 @@ try:
             continue
 
         depth_image = np.asanyarray(depth_frame.get_data())
-        scaled_depth_image = depth_image*depth_scale # Transform depths values to a real world depth value in meters
+        cropped_depth_image = depth_image[50:500, 500:900] # Bounding box: cropp shoulders
+        scaled_depth_image = cropped_depth_image*depth_scale # Transform depths values to a real world depth value in meters
         color_image = np.asanyarray(color_frame.get_data())
 
 
@@ -132,7 +131,7 @@ try:
 
         for r in range(0, num_rows):
             for c in range(0, num_columns):
-                if scaled_depth_image[r][c] > 1: # Background removal: if the distance is more than 1 meter, filter it
+                if scaled_depth_image[r][c] > clipping_distance: # Background removal: if the distance is more than 1 meter, filter it
                     scaled_depth_image[r][c] = 0
 
         pointcloud = convert_depth_frame_to_pointcloud(scaled_depth_image, intrin)
