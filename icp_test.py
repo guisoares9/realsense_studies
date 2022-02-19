@@ -6,16 +6,20 @@ import open3d as o3d
 import copy
 import numpy as np
 import time
+import math
 
 # Visualize surface matching result
-def draw_registration_result(source, target, transformation):
+def draw_registration_result(source, target, brain, transformation):
 
     source_temp = copy.deepcopy(source)
     target_temp = copy.deepcopy(target)
+    brain_temp = copy.deepcopy(brain)
     source_temp.paint_uniform_color([1, 0.706, 0])
     target_temp.paint_uniform_color([0, 0.651, 0.929])
     source_temp.transform(transformation)
-    o3d.visualization.draw_geometries([source_temp, target_temp])
+    new_transformation = np.matmul(transformation, trans_brain_Z)
+    brain_temp.transform(new_transformation)
+    o3d.visualization.draw_geometries([source_temp, target_temp, brain_temp])
 
 # Pre-process the point cloud for global registration
 def preprocess_point_cloud(pcd, voxel_size):
@@ -47,18 +51,36 @@ def execute_global_registration(source_down, target_down, source_fpfh, target_fp
     return result
 
 # Load brain and head point cloud
-brain = o3d.io.read_point_cloud("head.pcd")
-head = o3d.io.read_point_cloud("head_1.pcd")
+head_target = o3d.io.read_point_cloud("head.pcd")
+head_source = o3d.io.read_point_cloud("head_1.pcd")
+brain = o3d.io.read_point_cloud("brain.pcd")
 
-# Forward head position
+# Forward head_target position
 trans_head= [[1, 0, 0, 0], [0, 0, 1, 0], [0, 1, 0, 0], [0, 0, 0, 1]]
-head.transform(trans_head)
-head.scale(1.14, center=head.get_center())
+head_target.transform(trans_head)
 
-# # Find the inicial position
-# trans_brain= [[1, 0, 0, 0], [0, 0, 1, 0], [0, 1, 0, 0], [0, 0, 0, 1]]
-# brain.transform(trans_brain)
-# o3d.visualization.draw_geometries([head, brain])
+# Scale head_source, because it is a little bit smaller than the head_target
+head_source.scale(1.1, center=head_source.get_center())
+
+# Find the inicial position
+ang_deg = 168 # Em graus
+tx = 0
+ty = -173
+tz = 160
+# trans_brain_X = [[1, 0, 0, tx], 
+#                 [0, math.cos(ang_deg*math.pi/180), -math.sin(ang_deg*math.pi/180), ty], 
+#                 [0, math.sin(ang_deg*math.pi/180), math.cos(ang_deg*math.pi/180), tz], 
+#                 [0, 0, 0, 1]]
+# trans_brain_Y = [[math.cos(ang_deg*math.pi/180), 0, -math.sin(ang_deg*math.pi/180), tx], 
+#                 [0, 1, 0, ty], 
+#                 [math.sin(ang_deg*math.pi/180), 0, math.cos(ang_deg*math.pi/180), tz], 
+#                 [0, 0, 0, 1]]
+trans_brain_Z = [[math.cos(ang_deg*math.pi/180), -math.sin(ang_deg*math.pi/180), 0, tx], 
+                [math.sin(ang_deg*math.pi/180), math.cos(ang_deg*math.pi/180), 0, ty], 
+                [0, 0, 1, tz], 
+                [0, 0, 0, 1]]
+#brain.transform(trans_brain_Z)
+#o3d.visualization.draw_geometries([head_source, brain])
 
 
 
@@ -86,7 +108,7 @@ head.scale(1.14, center=head.get_center())
 
 
 # # ICP: GLOBAL REGISTRATION
-# voxel_size = 0.006*1000 # in meters. *1000 is just for scaling
+# voxel_size = 0.001*1000 # in meters. *1000 is just for scaling
 # source_down, source_fpfh = preprocess_point_cloud(brain, voxel_size)
 # target_down, target_fpfh = preprocess_point_cloud(head, voxel_size)
 # #o3d.visualization.draw_geometries([source_down])
@@ -107,8 +129,8 @@ head.scale(1.14, center=head.get_center())
 # ICP: Global registration and point-to-plane
 
 voxel_size = 0.006*1000 # in meters. *1000 is just for scaling
-source_down, source_fpfh = preprocess_point_cloud(brain, voxel_size)
-target_down, target_fpfh = preprocess_point_cloud(head, voxel_size)
+source_down, source_fpfh = preprocess_point_cloud(head_source, voxel_size)
+target_down, target_fpfh = preprocess_point_cloud(head_target, voxel_size)
 t = time.time()
 print("Apply Global Registration ICP")
 result_ransac = execute_global_registration(source_down, target_down,
@@ -127,4 +149,4 @@ reg_p2p = o3d.pipelines.registration.registration_icp(source_down, target_down, 
 print(f"{time.time()-t} segundos")
 print(reg_p2p)
 print(reg_p2p.transformation)
-draw_registration_result(source_down, target_down, reg_p2p.transformation)
+draw_registration_result(source_down, target_down, brain, reg_p2p.transformation)
